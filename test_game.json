@@ -1,0 +1,7 @@
+{
+    "title": "Village_fight",
+    "map_path": "map.png",
+    "num_tiles": 17,
+    "players_path": "players.json",
+    "monsters_path": "monsters.json"
+}

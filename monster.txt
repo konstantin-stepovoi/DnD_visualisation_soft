@@ -1,0 +1,10 @@
+[
+    {
+        "name": "Goblin",
+        "hp": 20,
+        "armor_class": 12,
+        "step_size": 2,
+        "avatar_path": "goblin.png",
+        "entity_type": "Monster"
+    }
+]
