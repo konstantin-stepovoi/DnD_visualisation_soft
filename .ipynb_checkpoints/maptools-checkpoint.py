@@ -79,3 +79,105 @@ def create_grid(rows, cols, cell_width, cell_height, start_x=0, start_y=0, total
             grid_row.append(GridCell(cell_x, cell_y, current_cell_width, current_cell_height))
         grid.append(grid_row)
     return grid
+
+
+
+class MapManager:
+    def __init__(self, grid):
+        """
+        Инициализация менеджера карты.
+
+        :param grid: Сетка (двумерный список объектов GridCell)
+        """
+        # Создаем таблицу такой же структуры, как и grid
+        self.rows = len(grid)
+        self.cols = len(grid[0]) if self.rows > 0 else 0
+        self.table = [[None for _ in range(self.cols)] for _ in range(self.rows)]
+
+        # Сохраняем границы ячеек для перевода координат
+        self.cell_width = grid[0][0].rect.width if self.rows > 0 and self.cols > 0 else 0
+        self.cell_height = grid[0][0].rect.height if self.rows > 0 and self.cols > 0 else 0
+        self.start_x = grid[0][0].rect.x if self.rows > 0 and self.cols > 0 else 0
+        self.start_y = grid[0][0].rect.y if self.rows > 0 and self.cols > 0 else 0
+
+    def _get_cell_indices(self, x, y):
+        """
+        Преобразует абсолютные координаты в индексы ячейки.
+
+        :param x: Абсолютная координата X
+        :param y: Абсолютная координата Y
+        :return: Кортеж (row, col) или None, если координаты вне сетки
+        """
+        col = (x - self.start_x) // self.cell_width
+        row = (y - self.start_y) // self.cell_height
+
+        if 0 <= col < self.cols and 0 <= row < self.rows:
+            return row, col
+        return None
+
+    def is_empty(self, x, y):
+        """
+        Проверяет, пустая ли ячейка по заданным координатам.
+
+        :param x: Абсолютная координата X
+        :param y: Абсолютная координата Y
+        :return: True, если ячейка пуста, иначе False
+        """
+        indices = self._get_cell_indices(x, y)
+        if indices:
+            row, col = indices
+            return self.table[row][col] is None
+        return False
+
+    def set_entity(self, x, y, entity):
+        """
+        Устанавливает объект в ячейку по заданным координатам.
+
+        :param x: Абсолютная координата X
+        :param y: Абсолютная координата Y
+        :param entity: Объект, который нужно установить
+        :return: True, если операция успешна, иначе False
+        """
+        indices = self._get_cell_indices(x, y)
+        if indices:
+            row, col = indices
+            for r in range(len(self.table)):
+                for c in range(len(self.table[r])):
+                    if self.table[r][c] == entity and (r != row or c != col):
+                        self.table[r][c] = None  # Очистка клетки
+            self.table[row][col] = entity
+            return True
+        return False
+
+    def remove_entity(self, x, y):
+        """
+        Убирает объект из ячейки по заданным координатам.
+
+        :param x: Абсолютная координата X
+        :param y: Абсолютная координата Y
+        :return: True, если операция успешна, иначе False
+        """
+        indices = self._get_cell_indices(x, y)
+        if indices:
+            row, col = indices
+            self.table[row][col] = None
+            return True
+        return False
+
+    def get_entity(self, x, y):
+        """
+        Возвращает объект из ячейки по заданным координатам.
+
+        :param x: Абсолютная координата X
+        :param y: Абсолютная координата Y
+        :return: Объект в ячейке или None
+        """
+        indices = self._get_cell_indices(x, y)
+        if indices:
+            row, col = indices
+            return self.table[row][col]
+        return None
+
+        
+
+
