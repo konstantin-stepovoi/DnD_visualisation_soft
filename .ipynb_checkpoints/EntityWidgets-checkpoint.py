@@ -3,8 +3,78 @@ from PIL import Image, ImageDraw
 import math
 import maptools
 
+class Button:
+    def __init__(self, button_name, entity, callback, x, y, size, icon_path):
+        self.button_name = button_name
+        self.entity = entity
+        self.callback = callback
+        self.x = x
+        self.y = y
+        self.size = size
+        self.rect = pygame.Rect(x, y, size, size)  # Прямоугольник кнопки
+        padding = 10
+        self.icon = pygame.transform.smoothscale(pygame.image.load(icon_path), (size - padding, size - padding))
+        self.is_pressed = False
+
+    def draw_button(self, surface):
+        """Рисует кнопку на переданном surface."""
+        # Скругленный прямоугольник
+        color = (200, 200, 200) if not self.is_pressed else (150, 150, 150)
+        pygame.draw.rect(surface, color, self.rect, border_radius=10)  # Скругленные края
+
+        # Отрисовка иконки
+        icon_rect = self.icon.get_rect(center=self.rect.center)  # Центрирование иконки
+        surface.blit(self.icon, icon_rect.topleft)  # Рисуем иконку
+
+    def on_click(self):
+        self.is_pressed = True
+        if self.callback:
+            self.callback(self.entity)  # Выполняем привязанную функцию
+
+
+class Toolbar:
+    def __init__(self, entity, x, y, cell_size):
+        self.entity = entity
+        self.isdrawn = None
+        self.x = x
+        self.y = y
+        self.cell_size = cell_size
+
+        # Иконки и функции для кнопок
+        button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
+        button_names = ["steps", "sword", "bow", "magic"]
+        button_callbacks = [self.move_steps, self.attack_sword, self.attack_bow, self.cast_magic]
+
+        # Создаем кнопки
+        self.buttons = [
+            Button(button_name, entity, callback, x + i * (cell_size + 10), y, cell_size, icon_path)
+            for i, (button_name, callback, icon_path) in enumerate(zip(button_names, button_callbacks, button_icons))
+        ]
+
+    def draw_yourself(self, surface):
+        """Рисует панель и кнопки на переданном surface."""
+        for button in self.buttons:
+            button.draw_button(surface)
+
+    
+
+
+    # Примерные методы, привязанные к кнопкам
+    def move_steps(self, entity):
+        print(f"{entity} делает шаги.")
+
+    def attack_sword(self, entity):
+        print(f"{entity} атакует мечом.")
+
+    def attack_bow(self, entity):
+        print(f"{entity} атакует луком.")
+
+    def cast_magic(self, entity):
+        print(f"{entity} кастует магию.")
+
+
 class EntityWidget:
-    def __init__(self, entity, diameter, initial_x, initial_y, cell_size, map_manager):
+    def __init__(self, entity, diameter, initial_x, initial_y, cell_size, map_manager, screen):
         self.entity = entity
         self.diameter = diameter
         self.is_dragging = False
@@ -15,15 +85,13 @@ class EntityWidget:
         self.cell_size = cell_size
         self.initial_position = (initial_x, initial_y)
         self.rect = pygame.Rect(self.initial_position[0], self.initial_position[1], cell_size, cell_size)
-
-        # Сохраняем map_manager
         self.map_manager = map_manager
-
-        # Загружаем аватар, обрезаем его в круг и конвертируем в Pygame Surface
         avatar_image = Image.open(self.entity.avatar).resize((diameter, diameter))
         self.avatar_surface = self._create_circular_avatar(avatar_image)
+        # Теперь займёмся генерацией тулбара
         self.toolbar = None
-
+        self.screen = screen
+        
     def _create_circular_avatar(self, image):
         """Обрезает изображение в круг и возвращает Pygame Surface."""
         size = image.size
@@ -37,12 +105,15 @@ class EntityWidget:
         return pygame.image.fromstring(circular_image.tobytes(), circular_image.size, circular_image.mode)
 
     def draw(self, surface):
-        """Рисует виджет на заданной поверхности."""
+        """Рисует виджет и тулбар (если он есть) на заданной поверхности."""
         surface.blit(self.avatar_surface, (self.x, self.y))
         center_x, center_y = self.x + self.diameter / 2, self.y + self.diameter / 2
-        
+    
         if self.entity.entity_type == 'Player':
             self._draw_hp_and_armor(surface, center_x, center_y)
+    
+        if self.toolbar:
+            self.toolbar.draw_yourself(surface)
 
 
     def _draw_hp_and_armor(self, surface, center_x, center_y):
@@ -113,9 +184,6 @@ class EntityWidget:
             # Вычисляем координаты центра клетки
             cell_corner_x = self.map_manager.start_x + (col * self.map_manager.cell_width) 
             cell_corner_y = self.map_manager.start_y + (row * self.map_manager.cell_height)
-            print(f'sx = {self.map_manager.cell_width, self.map_manager.cell_height}')
-            print(f'start_corner: {self.map_manager.start_x, self.map_manager.start_y}')
-            print(f'corner_x = {cell_corner_x}, corner_y = {cell_corner_y}')
             # Устанавливаем виджет в центр этой клетки
             self.x = cell_corner_x
             self.y = cell_corner_y
@@ -123,7 +191,24 @@ class EntityWidget:
             self.map_manager.set_entity(mouse_x, mouse_y, self.entity)
         else:
             self.snap_to_cell(mouse_x + self.diameter, mouse_y)
-                
+            
+        pygame.display.flip()
+
+                    
+    def update_toolbar_position(self):
+        """Обновляет положение тулбара в зависимости от текущей позиции виджета."""
+        if self.toolbar:
+            toolbar_x = self.x + self.diameter + 10  # Смещение справа от виджета
+            toolbar_y = self.y
+            self.toolbar.x = toolbar_x
+            self.toolbar.y = toolbar_y
+
+            # Обновляем позиции кнопок в тулбаре
+            for i, button in enumerate(self.toolbar.buttons):
+                button.x = toolbar_x + i * (self.cell_size + 10)
+                button.y = toolbar_y
+                button.rect.topleft = (button.x, button.y)
+
 
 
 #######################################################################################
@@ -140,9 +225,16 @@ class EntityWidget:
                 self.offset_x = mouse_x - self.x
                 self.offset_y = mouse_y - self.y
 
-            # Игнорируем правый клик мыши
             elif event.button == 3 and self.rect.collidepoint(mouse_x, mouse_y):
-                pass
+                if self.toolbar:
+                    self.toolbar = None
+                else:
+                    # Создаём тулбар на текущей позиции виджета
+                    toolbar_x = self.x + self.diameter + 10  # Смещение справа от виджета
+                    toolbar_y = self.y
+                    button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
+                    self.toolbar = Toolbar(self.entity, toolbar_x, toolbar_y, self.diameter)
+                return
     
         elif event.type == pygame.MOUSEMOTION:
             if self.is_dragging:
@@ -150,6 +242,7 @@ class EntityWidget:
                 self.x = mouse_x - self.offset_x
                 self.y = mouse_y - self.offset_y
                 self.rect.topleft = (self.x, self.y)
+                self.update_toolbar_position()
                 
         elif event.type == pygame.MOUSEBUTTONUP:
             mouse_x, mouse_y = event.pos
@@ -157,6 +250,7 @@ class EntityWidget:
                 mouse_x, mouse_y = event.pos
                 self.snap_to_cell(mouse_x, mouse_y)
                 self.is_dragging = False
+
                 
 
 

@@ -72,7 +72,7 @@ class Toolbar:
                     # Здесь можно вызвать действие, привязанное к кнопке
                     print(f"Button {self.buttons.index(button)} clicked!")
                     return True
-        return False  # Если клик вне кнопок тулбара
+        return False
 
 class EntityWidget:
     def __init__(self, entity, diameter, initial_x, initial_y, cell_size, map_manager):
