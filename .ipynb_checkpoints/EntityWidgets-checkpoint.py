@@ -3,74 +3,7 @@ from PIL import Image, ImageDraw
 import math
 import maptools
 
-class Button:
-    def __init__(self, button_name, entity, callback, x, y, size, icon_path):
-        self.button_name = button_name
-        self.entity = entity
-        self.callback = callback
-        self.x = x
-        self.y = y
-        self.size = size
-        self.rect = pygame.Rect(x, y, size, size)  # Прямоугольник кнопки
-        padding = 10
-        self.icon = pygame.transform.smoothscale(pygame.image.load(icon_path), (size - padding, size - padding))
-        self.is_pressed = False
-
-    def draw_button(self, surface):
-        """Рисует кнопку на переданном surface."""
-        # Скругленный прямоугольник
-        color = (200, 200, 200) if not self.is_pressed else (150, 150, 150)
-        pygame.draw.rect(surface, color, self.rect, border_radius=10)  # Скругленные края
-
-        # Отрисовка иконки
-        icon_rect = self.icon.get_rect(center=self.rect.center)  # Центрирование иконки
-        surface.blit(self.icon, icon_rect.topleft)  # Рисуем иконку
-
-    def on_click(self):
-        self.is_pressed = True
-        if self.callback:
-            self.callback(self.entity)  # Выполняем привязанную функцию
-
-
-class Toolbar:
-    def __init__(self, entity, x, y, cell_size):
-        self.entity = entity
-        self.isdrawn = None
-        self.x = x
-        self.y = y
-        self.cell_size = cell_size
-
-        # Иконки и функции для кнопок
-        button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
-        button_names = ["steps", "sword", "bow", "magic"]
-        button_callbacks = [self.move_steps, self.attack_sword, self.attack_bow, self.cast_magic]
-
-        # Создаем кнопки
-        self.buttons = [
-            Button(button_name, entity, callback, x + i * (cell_size + 10), y, cell_size, icon_path)
-            for i, (button_name, callback, icon_path) in enumerate(zip(button_names, button_callbacks, button_icons))
-        ]
-
-    def draw_yourself(self, surface):
-        """Рисует панель и кнопки на переданном surface."""
-        for button in self.buttons:
-            button.draw_button(surface)
-
-    
-
-
-    # Примерные методы, привязанные к кнопкам
-    def move_steps(self, entity):
-        print(f"{entity} делает шаги.")
-
-    def attack_sword(self, entity):
-        print(f"{entity} атакует мечом.")
-
-    def attack_bow(self, entity):
-        print(f"{entity} атакует луком.")
-
-    def cast_magic(self, entity):
-        print(f"{entity} кастует магию.")
+from fight_tools import Button, Toolbar
 
 
 class EntityWidget:
@@ -103,7 +36,7 @@ class EntityWidget:
         circular_image.paste(image, (0, 0), mask)
 
         return pygame.image.fromstring(circular_image.tobytes(), circular_image.size, circular_image.mode)
-
+        
     def draw(self, surface):
         """Рисует виджет и тулбар (если он есть) на заданной поверхности."""
         surface.blit(self.avatar_surface, (self.x, self.y))
@@ -168,31 +101,34 @@ class EntityWidget:
 
 
     def snap_to_cell(self, mouse_x, mouse_y):
-        '''
-        автоцентровка по клетке
-        '''
+        """
+        Автоцентровка виджета по клетке.
+        """
         # Проверяем, что координаты внутри границ карты
         if not (self.map_manager.start_x <= mouse_x <= self.map_manager.start_x + self.map_manager.cols * self.map_manager.cell_width and
                 self.map_manager.start_y <= mouse_y <= self.map_manager.start_y + self.map_manager.rows * self.map_manager.cell_height):
             return  # Если координаты вне поля, ничего не делаем
-                
-        if self.map_manager.get_entity(mouse_x, mouse_y) == None:
-            cell_indices = self.map_manager._get_cell_indices(mouse_x, mouse_y)
-            row, col = cell_indices
-            #так, ну row, col он считает правильно, окей
-            
-            # Вычисляем координаты центра клетки
-            cell_corner_x = self.map_manager.start_x + (col * self.map_manager.cell_width) 
-            cell_corner_y = self.map_manager.start_y + (row * self.map_manager.cell_height)
-            # Устанавливаем виджет в центр этой клетки
-            self.x = cell_corner_x
-            self.y = cell_corner_y
-            self.rect.topleft = (self.x, self.y)
-            self.map_manager.set_entity(mouse_x, mouse_y, self.entity)
-        else:
+
+        # Получаем индексы клетки
+        cell_indices = self.map_manager._get_cell_indices(mouse_x, mouse_y)
+        row, col = cell_indices
+
+        # Проверяем, занята ли клетка
+        if self.map_manager.get_entity(mouse_x, mouse_y) is not None:
+            # Если клетка занята, пробуем соседнюю
             self.snap_to_cell(mouse_x + self.diameter, mouse_y)
-            
-        pygame.display.flip()
+            return
+
+        # Если клетка свободна, перемещаем виджет
+        self.map_manager.remove_entity_by_value(self.entity)
+        cell_corner_x = self.map_manager.start_x + (col * self.map_manager.cell_width)
+        cell_corner_y = self.map_manager.start_y + (row * self.map_manager.cell_height)
+        self.x = cell_corner_x
+        self.y = cell_corner_y
+        self.rect.topleft = (self.x, self.y)
+        self.map_manager.set_entity(mouse_x, mouse_y, self.entity)
+
+
 
                     
     def update_toolbar_position(self):
@@ -209,13 +145,20 @@ class EntityWidget:
                 button.y = toolbar_y
                 button.rect.topleft = (button.x, button.y)
 
+    def update_position(self):
+        if self.map_manager.get_entity(self.x, self.y) is None:
+            self.map_manager.set_entity(self.x, self.y, self.entity)
+
+
 
 
 #######################################################################################
 
     
     def handle_event(self, event):
+        self.update_position() 
         """Обрабатывает события мыши для перетаскивания или клика правой кнопкой."""
+        
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = event.pos
             
@@ -224,16 +167,29 @@ class EntityWidget:
                 self.is_dragging = True
                 self.offset_x = mouse_x - self.x
                 self.offset_y = mouse_y - self.y
+                
+
+            elif self.toolbar and event.button == 1 and any(button.rect.collidepoint(event.pos) for button in self.toolbar.buttons):
+                # Найти нажатую кнопку и вызвать её метод
+                for button in self.toolbar.buttons:
+                    if button.rect.collidepoint(event.pos):
+                        button.on_click()
+                        self.update_position()
+                        return
+
+                
 
             elif event.button == 3 and self.rect.collidepoint(mouse_x, mouse_y):
                 if self.toolbar:
                     self.toolbar = None
+                    self.update_position()
                 else:
                     # Создаём тулбар на текущей позиции виджета
                     toolbar_x = self.x + self.diameter + 10  # Смещение справа от виджета
                     toolbar_y = self.y
                     button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
-                    self.toolbar = Toolbar(self.entity, toolbar_x, toolbar_y, self.diameter)
+                    self.toolbar = Toolbar(self, self.entity, toolbar_x, toolbar_y, self.diameter)
+                    self.update_position()
                 return
     
         elif event.type == pygame.MOUSEMOTION:
@@ -243,13 +199,16 @@ class EntityWidget:
                 self.y = mouse_y - self.offset_y
                 self.rect.topleft = (self.x, self.y)
                 self.update_toolbar_position()
+
                 
         elif event.type == pygame.MOUSEBUTTONUP:
-            mouse_x, mouse_y = event.pos
-            if event.button == 1 and self.rect.collidepoint(mouse_x, mouse_y):
+            if self.is_dragging:
                 mouse_x, mouse_y = event.pos
-                self.snap_to_cell(mouse_x, mouse_y)
+                self.map_manager.remove_entity_by_value(self.entity)
+                if event.button == 1 and self.rect.collidepoint(mouse_x, mouse_y):
+                    self.snap_to_cell(mouse_x, mouse_y)
                 self.is_dragging = False
+
 
                 
 

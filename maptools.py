@@ -89,10 +89,13 @@ class MapManager:
 
         :param grid: Сетка (двумерный список объектов GridCell)
         """
-        # Создаем таблицу такой же структуры, как и grid
+        # Создаем таблицу для объектов
         self.rows = len(grid)
         self.cols = len(grid[0]) if self.rows > 0 else 0
         self.table = [[None for _ in range(self.cols)] for _ in range(self.rows)]
+
+        # Создаем таблицу для урона
+        self.damage_table = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
 
         # Сохраняем границы ячеек для перевода координат
         self.cell_width = grid[0][0].rect.width if self.rows > 0 and self.cols > 0 else 0
@@ -177,6 +180,41 @@ class MapManager:
             row, col = indices
             return self.table[row][col]
         return None
+
+    def remove_entity_by_value(self, entity):
+        """
+        Удаляет все вхождения заданного объекта из таблицы.
+
+        :param entity: Объект, который нужно удалить
+        """
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.table[row][col] == entity:
+                    self.table[row][col] = None
+
+    def set_damage(self, x, y, damage):
+        """
+        Устанавливает значение урона в таблицу damage_table по заданным координатам.
+
+        :param x: Абсолютная координата X
+        :param y: Абсолютная координата Y
+        :param damage: Значение урона (int)
+        :return: True, если операция успешна, иначе False
+        """
+        indices = self._get_cell_indices(x, y)
+        if indices:
+            row, col = indices
+            self.damage_table[row][col] = damage
+            return True
+        return False
+
+    def reset_damage(self):
+        """
+        Обнуляет всю таблицу damage_table.
+        """
+        for row in range(self.rows):
+            for col in range(self.cols):
+                self.damage_table[row][col] = 0
 
         
 
