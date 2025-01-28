@@ -6,6 +6,8 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter.simpledialog import askstring
+from SpellWidgets import BowSpell, LinearSpell, CircularSpell, TriangleSpell
+
 
 def input_box_tk(prompt):
     root = tk.Tk()
@@ -87,14 +89,14 @@ class Button:
 
 
 class Toolbar:
-
-    def __init__(self, widget, entity, x, y, cell_size):
+    def __init__(self, widget, entity, x, y, cell_size, spell_widgets):
         self.entity = entity
         self.isdrawn = None
         self.x = x
         self.y = y
         self.cell_size = cell_size
         self.widget = widget
+        self.spell_widgets = spell_widgets
 
         # Иконки и функции для кнопок
         button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
@@ -128,7 +130,6 @@ class Toolbar:
         top_left_y = widget_center_y - rect_len // 2
         step_surface = pygame.Surface((rect_len, rect_len), pygame.SRCALPHA)
         step_surface.fill((152, 251, 152, 20))  # Цвет с альфа-каналом
-
         # Рисуем поверхность на экране
         cur_rect = self.widget.screen.blit(step_surface, (top_left_x, top_left_y))
         pygame.display.flip()
@@ -138,11 +139,13 @@ class Toolbar:
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     click_pos = pygame.mouse.get_pos()
-                    #print(f"Вы кликнули по координатам: {click_pos}")
                     mx, my = click_pos
                     if not cur_rect.collidepoint(mx, my):
                         return
-                    if self.widget.map_manager.get_entity(mx, my) is not None:
+                    enemy = self.widget.map_manager.get_entity(mx, my)
+                    row, col = self.widget.map_manager._get_cell_indices(mx, my)
+                    print(f'Step detected enemy at {row}, {col}: {enemy}')
+                    if enemy is not None:
                         return
                     self.widget.map_manager.remove_entity(mx, my)
                     self.widget.map_manager.remove_entity_by_value(self.entity)
@@ -179,25 +182,25 @@ class Toolbar:
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     click_pos = pygame.mouse.get_pos()
-                    #print(f"Вы кликнули по координатам: {click_pos}")
                     mx, my = click_pos
                     if not hitbox_rect.collidepoint(mx, my):
                         return
                     entity = self.widget.map_manager.get_entity(mx, my)
+                    enemy = self.widget.map_manager.get_entity(mx, my)
+                    row, col = self.widget.map_manager._get_cell_indices(mx, my)
+                    print(f'Sword detected enemy at {row}, {col}: {enemy}')
                     if entity:
                         armor_class = entity.armor_class
                         roll_input = input_box_tk("Enter roll")
                         if roll_input and roll_input.isdigit():
                             roll = int(roll_input)
-                            #print(f'roll: {roll}, ak = {armor_class}')
                             if roll >= armor_class:
                                 message_box('Попадание!')
-                                print("Hit! Enter damage:")
                                 # Ввод урона
                                 damage_input = input_box_tk("Enter damage")
                                 if damage_input and damage_input.isdigit():
                                     damage = int(damage_input)
-                                    #print(f"Damage dealt: {damage}")
+                                    self.widget.map_manager.set_damage(mx, my, damage)
                                 else:
                                     print("Invalid damage input.")
                             else:
@@ -212,7 +215,16 @@ class Toolbar:
                     
 
     def attack_bow(self, entity):
-        print(f"{entity} атакует луком.")
+        screen = self.widget.screen
+        """
+        Режим атаки луком: рисует квадрат под курсором до завершения кликом ЛКМ.
+        """
+        attack_widget = self.spell_widgets[0]
+        attack_widget.visible = True
+        #attack_widget.x = self.x + 2 * (self.cell_size + 10)
+        #attack_widget.y = self.y + 1 * (self.cell_size + 10)
+        attack_widget.draw()
+
 
     def cast_magic(self, entity):
         print(f"{entity} кастует магию.")

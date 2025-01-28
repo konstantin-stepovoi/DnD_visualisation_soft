@@ -7,7 +7,7 @@ from fight_tools import Button, Toolbar
 
 
 class EntityWidget:
-    def __init__(self, entity, diameter, initial_x, initial_y, cell_size, map_manager, screen):
+    def __init__(self, entity, diameter, initial_x, initial_y, cell_size, map_manager, screen, spell_widgets):
         self.entity = entity
         self.diameter = diameter
         self.is_dragging = False
@@ -24,6 +24,7 @@ class EntityWidget:
         # Теперь займёмся генерацией тулбара
         self.toolbar = None
         self.screen = screen
+        self.spell_widgets = spell_widgets
         
     def _create_circular_avatar(self, image):
         """Обрезает изображение в круг и возвращает Pygame Surface."""
@@ -42,7 +43,7 @@ class EntityWidget:
         surface.blit(self.avatar_surface, (self.x, self.y))
         center_x, center_y = self.x + self.diameter / 2, self.y + self.diameter / 2
     
-        if self.entity.entity_type == 'Player':
+        if self.entity.entity_type is not None:
             self._draw_hp_and_armor(surface, center_x, center_y)
     
         if self.toolbar:
@@ -127,6 +128,7 @@ class EntityWidget:
         self.y = cell_corner_y
         self.rect.topleft = (self.x, self.y)
         self.map_manager.set_entity(mouse_x, mouse_y, self.entity)
+        #self.map_manager.report_entities()
 
 
 
@@ -148,6 +150,11 @@ class EntityWidget:
     def update_position(self):
         if self.map_manager.get_entity(self.x, self.y) is None:
             self.map_manager.set_entity(self.x, self.y, self.entity)
+
+    def get_damage(self):
+        damage = self.map_manager.get_damage(self.x, self.y)
+        if isinstance(damage, int):
+            self.entity.hp = self.entity.hp - damage
 
 
 
@@ -188,7 +195,7 @@ class EntityWidget:
                     toolbar_x = self.x + self.diameter + 10  # Смещение справа от виджета
                     toolbar_y = self.y
                     button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
-                    self.toolbar = Toolbar(self, self.entity, toolbar_x, toolbar_y, self.diameter)
+                    self.toolbar = Toolbar(self, self.entity, toolbar_x, toolbar_y, self.diameter, self.spell_widgets)
                     self.update_position()
                 return
     

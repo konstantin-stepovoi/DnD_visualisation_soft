@@ -216,6 +216,20 @@ class MapManager:
             for col in range(self.cols):
                 self.damage_table[row][col] = 0
 
-        
+    def get_damage(self, x, y):
+        indices = self._get_cell_indices(x, y)
+        if indices:
+            row, col = indices
+            damage = self.damage_table[row][col]
+            return damage
+
+    def report_entities(self):
+        print(f'E status check started')
+        for row in range(self.rows):
+            for col in range(self.cols):
+                if self.table[row][col] is not None:
+                    entity = self.table[row][col]
+                    print(f'found En at {row}, {col}, {entity}')
+        print(f'E status check ended')
 
 
