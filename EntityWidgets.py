@@ -48,6 +48,8 @@ class EntityWidget:
     
         if self.toolbar:
             self.toolbar.draw_yourself(surface)
+            if self.toolbar.sub_toolbar.isdrawn == True:
+                self.toolbar.sub_toolbar.draw_yourself(surface)
 
 
     def _draw_hp_and_armor(self, surface, center_x, center_y):
@@ -140,11 +142,17 @@ class EntityWidget:
             toolbar_y = self.y
             self.toolbar.x = toolbar_x
             self.toolbar.y = toolbar_y
+            self.toolbar.sub_toolbar.x = toolbar_x
+            self.toolbar.sub_toolbar.y = toolbar_y
 
             # Обновляем позиции кнопок в тулбаре
             for i, button in enumerate(self.toolbar.buttons):
                 button.x = toolbar_x + i * (self.cell_size + 10)
                 button.y = toolbar_y
+                button.rect.topleft = (button.x, button.y)
+            for i, button in enumerate(self.toolbar.sub_toolbar.buttons):
+                button.x = toolbar_x + i * (self.cell_size + 10)
+                button.y = toolbar_y + self.cell_size
                 button.rect.topleft = (button.x, button.y)
 
     def update_position(self):
@@ -177,8 +185,13 @@ class EntityWidget:
                 
 
             elif self.toolbar and event.button == 1 and any(button.rect.collidepoint(event.pos) for button in self.toolbar.buttons):
-                # Найти нажатую кнопку и вызвать её метод
                 for button in self.toolbar.buttons:
+                    if button.rect.collidepoint(event.pos):
+                        button.on_click()
+                        self.update_position()
+                        return
+            elif self.toolbar and self.toolbar.sub_toolbar.isdrawn == True and event.button == 1 and any(button.rect.collidepoint(event.pos) for button in self.toolbar.sub_toolbar.buttons):
+                for button in self.toolbar.sub_toolbar.buttons:
                     if button.rect.collidepoint(event.pos):
                         button.on_click()
                         self.update_position()
@@ -214,6 +227,8 @@ class EntityWidget:
                 self.map_manager.remove_entity_by_value(self.entity)
                 if event.button == 1 and self.rect.collidepoint(mouse_x, mouse_y):
                     self.snap_to_cell(mouse_x, mouse_y)
+                    self.update_position()
+                    self.update_toolbar_position()
                 self.is_dragging = False
 
 

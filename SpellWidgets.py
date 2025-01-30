@@ -13,8 +13,8 @@ def input_box_tk(prompt):
     Окно ввода с использованием tkinter.
     Возвращает введенное значение.
     """
-    root.withdraw()  # Скрыть основное окно tkinter
-    root.attributes("-topmost", True)  # Поверх всех окон
+    root.withdraw()  
+    root.attributes("-topmost", True)
     result = askstring("Input", prompt)
     root.attributes("-topmost", False)  # Снять приоритет
     root.deiconify()  # Вернуть окно tkinter
@@ -64,7 +64,7 @@ class SpellWidget:
         self.x = x
         self.y = y
         self.visible = False  # Для отслеживания видимости
-        self.rect = pygame.Rect(self.x, self.y, self.cell_size, self.cell_size)  # Площадь, занимаемая виджетом
+        self.rect = pygame.Rect(self.x, self.y, self.cell_size, self.cell_size)
         self.dragging = False  # Флаг для отслеживания перетаскивания
         self.offset_x = 0  # Смещение по x для таскания из центра
         self.offset_y = 0  # Смещение по y для таскания из центра
@@ -97,6 +97,20 @@ class SpellWidget:
         self.visible = False
         self.rect.topleft = (0, 0)
         self.dragging = False
+        # Сбрасываем флаг инициализации
+    
+        # Обнуляем специфические параметры для каждого заклинания
+        if isinstance(self, LinearSpell):
+            self.length = 0
+            self.initialized = False
+        elif isinstance(self, TriangleSpell):
+            self.initialized = False
+            self.height = 0
+            self.base = 0
+        elif isinstance(self, CircularSpell):
+            self.initialized = False
+            self.radius = 0
+
 
     def attack(self, x, y):
         print(x, y)
@@ -107,7 +121,6 @@ class SpellWidget:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
                 self.dragging = True
-                # Вычисляем смещение от центра виджета
                 self.offset_x = self.rect.centerx - event.pos[0]
                 self.offset_y = self.rect.centery - event.pos[1]
 
@@ -118,7 +131,6 @@ class SpellWidget:
                 self.dragging = False
                 self.snap_to_cell(self.rect.x, self.rect.y)
                 self.attack(mx, my)
-
                 self.delete()
                 
 
@@ -137,10 +149,11 @@ class BowSpell(SpellWidget):
     def attack(self, x, y):
         mx, my = x, y
         enemy = self.map_manager.get_entity(mx, my)
-        row, col = self.map_manager._get_cell_indices(mx, my)
+        try:
+            row, col = self.map_manager._get_cell_indices(mx, my)
+        except TypeError:
+            return
         print(f'Bow detected enemy at {row}, {col}: {enemy}')
-        #print(f'bow attack to {mx, my}')
-        #print(self.map_manager.table)
         entity = self.map_manager.get_entity(mx, my)
         print(entity)
         if entity is None:
@@ -161,14 +174,92 @@ class BowSpell(SpellWidget):
 class LinearSpell(SpellWidget):
     def __init__(self, screen, x, y, cell_size, map_manager):
         super().__init__(screen, x, y, cell_size, map_manager)
-        # Логика для LinearSpell
+        self.length = 0
+        self.initialized = False  # Флаг инициализации
+
+    def draw(self):
+        if self.visible:
+            if not self.initialized:
+                try:
+                    self.length = int(input_box_tk("Enter length"))
+                    self.initialized = True
+                except TypeError:
+                    self.initialized, self.visible = False, False
+                    return
+                # Инициализируем rect ОДИН раз
+            self.x, self.y = self.rect.topleft
+            self.rect = pygame.Rect(self.x, self.y, self.length * self.cell_size, self.cell_size)
+
+            # Обновляем только позицию, а не создаём новый rect
+            self.rect.topleft = (self.x, self.y)
+            pygame.draw.rect(self.screen, (0, 100, 0, 100), self.rect)
 
 class TriangleSpell(SpellWidget):
     def __init__(self, screen, x, y, cell_size, map_manager):
         super().__init__(screen, x, y, cell_size, map_manager)
-        # Логика для TriangleSpell
+        self.height = 0
+        self.base = 0
+        self.initialized = False  
+
+    def draw(self):
+        if self.visible:
+            if not self.initialized:
+                try:
+                    self.height = int(input_box_tk("Enter height"))
+                    self.base = int(input_box_tk("Enter base"))
+                    self.initialized = True
+                except (TypeError, ValueError):
+                    self.initialized, self.visible = False, False
+                    return
+
+            # Пересчитываем координаты треугольника относительно центра self.rect
+            base_half = (self.base * self.cell_size) // 2
+            top_x = self.rect.centerx
+            top_y = self.rect.top
+            left_x = self.rect.centerx - base_half
+            left_y = self.rect.bottom
+            right_x = self.rect.centerx + base_half
+            right_y = left_y
+
+            points = [(top_x, top_y), (left_x, left_y), (right_x, right_y)]
+            
+            # Обновляем self.rect, чтобы описывать треугольник
+            min_x = min(top_x, left_x, right_x)
+            max_x = max(top_x, left_x, right_x)
+            min_y = min(top_y, left_y, right_y)
+            max_y = max(top_y, left_y, right_y)
+            
+            self.rect = pygame.Rect(min_x, min_y, max_x - min_x, max_y - min_y)
+
+            # Отрисовка треугольника
+            pygame.draw.polygon(self.screen, (0, 0, 100, 100), points)
+
+
 
 class CircularSpell(SpellWidget):
     def __init__(self, screen, x, y, cell_size, map_manager):
         super().__init__(screen, x, y, cell_size, map_manager)
-        # Логика для CircularSpell
+        self.radius = 0
+        self.initialized = False  # Флаг инициализации
+    
+    def draw(self):
+        if self.visible:
+            if not self.initialized:
+                try:
+                    self.radius = int(input_box_tk("Enter radius"))
+                    self.initialized = True
+                except TypeError:
+                    self.initialized, self.visible = False, False
+                    return
+            
+            self.rect = pygame.Rect(
+                self.rect.centerx - self.radius * self.cell_size,
+                self.rect.centery - self.radius * self.cell_size,
+                self.radius * 2 * self.cell_size,
+                self.radius * 2 * self.cell_size)
+
+            pygame.gfxdraw.filled_circle(
+                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, (100, 0, 100, 100)
+            )
+            pygame.gfxdraw.aacircle(
+                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, (100, 0, 100, 100))

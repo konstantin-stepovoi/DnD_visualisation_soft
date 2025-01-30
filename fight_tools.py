@@ -87,6 +87,38 @@ class Button:
         if self.callback:
             self.callback(self.entity)  # Выполняем привязанную функцию
 
+class SubToolbar:
+    def __init__(self, parent_toolbar, entity, x, y, cell_size, spell_icons, callbacks):
+        self.parent_toolbar = parent_toolbar
+        self.entity = entity
+        self.isdrawn = False
+        self.x = x
+        self.y = y + cell_size
+        self.cell_size = cell_size
+
+        # Создаем кнопки для подменю
+        self.buttons = [
+            Button(f"spell_{i}", entity, callback, self.x + i * (cell_size + 10), self.y, cell_size, icon)
+            for i, (icon, callback) in enumerate(zip(spell_icons, callbacks))
+        ]
+
+    def draw_yourself(self, surface):
+        """Рисует тулбар на переданном surface."""
+        if self.isdrawn == False:
+            return
+        for button in self.buttons:
+            button.draw_button(surface)
+        self.isdrawn = True
+
+
+    def handle_event(self, event):
+        """Обрабатывает события для подменю."""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            click_pos = pygame.mouse.get_pos()
+            for button in self.buttons:
+                if button.rect.collidepoint(click_pos):
+                    button.on_click()
+
 
 class Toolbar:
     def __init__(self, widget, entity, x, y, cell_size, spell_widgets):
@@ -97,6 +129,10 @@ class Toolbar:
         self.cell_size = cell_size
         self.widget = widget
         self.spell_widgets = spell_widgets
+        spell_icons = ['Line_icon.png', 'Con_icon.png', 'Rad_icon.png']
+        callbacks = [self.cast_line, self.cast_cone, self.cast_radius]
+        self.sub_toolbar = SubToolbar(self, self.entity, self.x, self.y, self.cell_size, spell_icons, callbacks)
+        self.subtoolbar_active = False  # Флаг активности сабтулбара
 
         # Иконки и функции для кнопок
         button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
@@ -215,16 +251,33 @@ class Toolbar:
                     
 
     def attack_bow(self, entity):
-        screen = self.widget.screen
-        """
-        Режим атаки луком: рисует квадрат под курсором до завершения кликом ЛКМ.
-        """
         attack_widget = self.spell_widgets[0]
         attack_widget.visible = True
-        #attack_widget.x = self.x + 2 * (self.cell_size + 10)
-        #attack_widget.y = self.y + 1 * (self.cell_size + 10)
         attack_widget.draw()
 
 
     def cast_magic(self, entity):
-        print(f"{entity} кастует магию.")
+        spell_icons = ['Line_icon.png', 'Con_icon.png', 'Rad_icon.png']
+        callbacks = [self.cast_line, self.cast_cone, self.cast_radius]
+        if self.sub_toolbar.isdrawn:
+            self.sub_toolbar.isdrawn = False
+        else:
+            self.sub_toolbar.isdrawn = True
+            self.sub_toolbar.draw_yourself(self.widget.screen)
+        pygame.display.flip()
+
+
+    def cast_line(self, entity):
+        attack_widget = self.spell_widgets[1]
+        attack_widget.visible = True
+        attack_widget.draw()
+
+    def cast_cone(self, entity):
+        attack_widget = self.spell_widgets[3]
+        attack_widget.visible = True
+        attack_widget.draw()
+
+    def cast_radius(self, entity):
+        attack_widget = self.spell_widgets[2]
+        attack_widget.visible = True
+        attack_widget.draw()
