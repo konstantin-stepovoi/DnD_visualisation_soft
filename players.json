@@ -5,6 +5,7 @@
         "armor_class": 15,
         "step_size": 3,
         "avatar_path": "Elf.png",
+        "death_avatar": "Elf_dead.png",
         "entity_type": "Player"
     }
 ,
@@ -14,6 +15,7 @@
         "armor_class": 11,
         "step_size": 4,
         "avatar_path": "gnome.png",
+        "death_avatar": "gnome_dead.png",
         "entity_type": "Player"
     }
 ]

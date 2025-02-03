@@ -253,7 +253,8 @@ class Toolbar:
     def attack_bow(self, entity):
         attack_widget = self.spell_widgets[0]
         attack_widget.visible = True
-        attack_widget.draw()
+        mx, my = pygame.mouse.get_pos()
+        attack_widget.draw(mx, my)
 
 
     def cast_magic(self, entity):
@@ -268,16 +269,23 @@ class Toolbar:
 
 
     def cast_line(self, entity):
+        center_x, center_y = self.widget.x + self.widget.diameter / 2, self.widget.y + self.widget.diameter / 2
         attack_widget = self.spell_widgets[1]
         attack_widget.visible = True
-        attack_widget.draw()
+        attack_widget.x = center_x
+        attack_widget.y = center_y
+        attack_widget.draw(center_x, center_y)
 
     def cast_cone(self, entity):
+        center_x, center_y = self.widget.x + self.widget.diameter / 2, self.widget.y + self.widget.diameter / 2
         attack_widget = self.spell_widgets[3]
+        attack_widget.x = center_x
+        attack_widget.y = center_y
         attack_widget.visible = True
-        attack_widget.draw()
+        attack_widget.draw(center_x, center_y)
 
     def cast_radius(self, entity):
         attack_widget = self.spell_widgets[2]
         attack_widget.visible = True
-        attack_widget.draw()
+        mx, my = pygame.mouse.get_pos()
+        attack_widget.draw(mx, my)

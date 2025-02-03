@@ -111,8 +111,8 @@ class MapManager:
         :param y: Абсолютная координата Y
         :return: Кортеж (row, col) или None, если координаты вне сетки
         """
-        col = (x - self.start_x) // self.cell_width
-        row = (y - self.start_y) // self.cell_height
+        col = int((x - self.start_x) // self.cell_width)
+        row = int((y - self.start_y) // self.cell_height)
 
         if 0 <= col < self.cols and 0 <= row < self.rows:
             return row, col

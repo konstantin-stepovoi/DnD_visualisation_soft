@@ -1,9 +1,11 @@
 import pygame
 import pygame.gfxdraw
 import sys
+import numpy as np
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter.simpledialog import askstring
+from math import floor, sqrt, atan2, cos, sin, radians, degrees
 
 def input_box_tk(prompt):
     root = tk.Tk()
@@ -71,8 +73,10 @@ class SpellWidget:
         self.dropped_position = (self.x, self.y)  # Координаты последнего дропа
         self.map_manager = map_manager
 
-    def draw(self):
+    def draw(self, x, y):
         if self.visible:  # Отрисовываем только если видим
+            center_x = x
+            center_y = y
             radius = self.cell_size // 2
             center = self.rect.center
             pygame.gfxdraw.filled_circle(self.screen, center[0], center[1], radius, (100, 0, 0, 100))
@@ -141,25 +145,54 @@ class SpellWidget:
                 self.rect.y = event.pos[1] + self.offset_y - self.rect.height // 2
 
 
-# Подклассы для разных типов заклинаний
 class BowSpell(SpellWidget):
     def __init__(self, screen, x, y, cell_size, map_manager):
         super().__init__(screen, x, y, cell_size, map_manager)
-        
+        self.dragging = False  # НЕ в режиме перетаскивания при создании
+
+    def draw(self, x, y):
+        """Рисует спелл вокруг курсора, если он активен."""
+        if self.visible:
+            self.rect.center = (x, y)
+            radius = self.cell_size // 2
+            pygame.gfxdraw.filled_circle(self.screen, self.rect.centerx, self.rect.centery, radius, (100, 0, 0, 100))
+            pygame.gfxdraw.aacircle(self.screen, self.rect.centerx, self.rect.centery, radius, (100, 0, 0, 100))
+
+    def handle_event(self, event):
+        if not self.visible:
+            return
+
+        if event.type == pygame.MOUSEMOTION and self.dragging:
+            self.rect.center = event.pos  # Двигаем за мышью
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if not self.dragging:  
+                # Первый клик (начало прицеливания)
+                self.dragging = True
+            else:
+                # Второй клик (атака)
+                self.dragging = False
+                mx, my = event.pos
+                self.snap_to_cell(mx, my)
+                pygame.display.flip()
+                self.attack(mx, my)
+                self.delete()
+
     def attack(self, x, y):
+        """Проверка на попадание и нанесение урона."""
         mx, my = x, y
         enemy = self.map_manager.get_entity(mx, my)
         try:
             row, col = self.map_manager._get_cell_indices(mx, my)
         except TypeError:
             return
-        print(f'Bow detected enemy at {row}, {col}: {enemy}')
-        entity = self.map_manager.get_entity(mx, my)
-        print(entity)
-        if entity is None:
+        
+        print(f'Bow detected enemy at {row}, {col}: {enemy}, visibility: {self.visible}')
+        if enemy is None:
             return
+        
         roll_input = input_box_tk("Enter roll")
-        armor_class = entity.armor_class
+        armor_class = enemy.armor_class
         if roll_input and roll_input.isdigit():
             roll = int(roll_input)
             if roll >= armor_class:
@@ -168,16 +201,22 @@ class BowSpell(SpellWidget):
                 if damage_input and damage_input.isdigit():
                     damage = int(damage_input)
                     self.map_manager.set_damage(mx, my, damage)
-            else: message_box('Промах!')
-        return
+            else:
+                message_box('Промах!')
+
+
+
 
 class LinearSpell(SpellWidget):
     def __init__(self, screen, x, y, cell_size, map_manager):
         super().__init__(screen, x, y, cell_size, map_manager)
         self.length = 0
-        self.initialized = False  # Флаг инициализации
+        self.initialized = False
+        self.angle = 0  # Угол поворота
+        self.dragging = False  
 
-    def draw(self):
+    def draw(self, x, y):
+        """Рисует прямоугольник вдоль направления на курсор"""
         if self.visible:
             if not self.initialized:
                 try:
@@ -186,13 +225,78 @@ class LinearSpell(SpellWidget):
                 except TypeError:
                     self.initialized, self.visible = False, False
                     return
-                # Инициализируем rect ОДИН раз
-            self.x, self.y = self.rect.topleft
-            self.rect = pygame.Rect(self.x, self.y, self.length * self.cell_size, self.cell_size)
+            
+            # Вычисляем угол между начальной точкой (x, y) и текущим положением курсора
+            dx = x - self.x
+            dy = y - self.y
+            self.angle = atan2(dy, dx)  # Угол в радианах
 
-            # Обновляем только позицию, а не создаём новый rect
-            self.rect.topleft = (self.x, self.y)
-            pygame.draw.rect(self.screen, (0, 100, 0, 100), self.rect)
+            # Вычисляем координаты второй короткой стороны
+            end_x = self.x + cos(self.angle) * (self.length+0.5)* self.cell_size
+            end_y = self.y + sin(self.angle) * (self.length+0.5) * self.cell_size
+
+            # Рисуем прямоугольник вдоль направления
+            pygame.draw.line(self.screen, (0, 100, 0, 100), (self.x, self.y), (end_x, end_y), self.cell_size//3)
+
+    def handle_event(self, event):
+        """Обрабатывает ввод игрока"""
+        if not self.visible:
+            return
+
+        if event.type == pygame.MOUSEMOTION and self.dragging:
+            mx, my = event.pos
+            self.draw(mx, my)
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if not self.dragging:
+                self.dragging = True
+            else:
+                self.dragging = False
+                self.attack()
+                self.delete()
+
+    def attack(self):
+        """Проводит атаку по всем врагам в линии (кроме клетки с магом)"""
+        enemies_hit = []
+        
+        '''
+        Сейчас не работает вот этот кусок!
+        тут надо поправить определение координат в которые будем пытаться атаковать
+        '''
+        
+        # Вычисляем шаги вдоль линии
+        for i in range(1, self.length + 1):
+            check_x = self.x + cos(self.angle) * i * self.cell_size
+            check_y = self.y + sin(self.angle) * i * self.cell_size
+
+            enemy = self.map_manager.get_entity(check_x, check_y)
+            if enemy:
+                enemies_hit.append((enemy, check_x, check_y))
+
+        if not enemies_hit:
+            return  
+
+        roll_input = input_box_tk("Enter roll")
+        if not roll_input or not roll_input.isdigit():
+            return  
+        roll = int(roll_input)
+
+        # Фильтруем, кого можно атаковать
+        successful_hits = [(enemy, x, y) for enemy, x, y in enemies_hit if roll >= enemy.armor_class]
+
+        if not successful_hits:
+            message_box("Промах!")
+            return
+
+        damage_input = input_box_tk("Enter damage")
+        if not damage_input or not damage_input.isdigit():
+            return
+        damage = int(damage_input)
+
+        for _, x, y in successful_hits:
+            self.map_manager.set_damage(x, y, damage)
+
+
 
 class TriangleSpell(SpellWidget):
     def __init__(self, screen, x, y, cell_size, map_manager):
@@ -200,8 +304,10 @@ class TriangleSpell(SpellWidget):
         self.height = 0
         self.base = 0
         self.initialized = False  
+        self.angle = 0  # Угол поворота
+        self.dragging = False  
 
-    def draw(self):
+    def draw(self, x, y):
         if self.visible:
             if not self.initialized:
                 try:
@@ -212,37 +318,103 @@ class TriangleSpell(SpellWidget):
                     self.initialized, self.visible = False, False
                     return
 
-            # Пересчитываем координаты треугольника относительно центра self.rect
-            base_half = (self.base * self.cell_size) // 2
-            top_x = self.rect.centerx
-            top_y = self.rect.top
-            left_x = self.rect.centerx - base_half
-            left_y = self.rect.bottom
-            right_x = self.rect.centerx + base_half
-            right_y = left_y
+            dx = x - self.x
+            dy = y - self.y
+            self.angle = atan2(dy, dx)  # Угол в радианах
 
-            points = [(top_x, top_y), (left_x, left_y), (right_x, right_y)]
+            # Координаты вершины треугольника (закреплены на маге)
+            top_x, top_y = self.x, self.y
             
-            # Обновляем self.rect, чтобы описывать треугольник
-            min_x = min(top_x, left_x, right_x)
-            max_x = max(top_x, left_x, right_x)
-            min_y = min(top_y, left_y, right_y)
-            max_y = max(top_y, left_y, right_y)
+            # Вычисляем координаты основания
+            base_half = (self.base * self.cell_size) / 2
+            base_center_x = self.x + cos(self.angle) * self.height * self.cell_size
+            base_center_y = self.y + sin(self.angle) * self.height * self.cell_size
             
-            self.rect = pygame.Rect(min_x, min_y, max_x - min_x, max_y - min_y)
+            left_x = base_center_x + sin(self.angle) * base_half
+            left_y = base_center_y - cos(self.angle) * base_half
+            right_x = base_center_x - sin(self.angle) * base_half
+            right_y = base_center_y + cos(self.angle) * base_half
 
-            # Отрисовка треугольника
-            pygame.draw.polygon(self.screen, (0, 0, 100, 100), points)
+            self.triangle_points = [(top_x, top_y), (left_x, left_y), (right_x, right_y)]
+            pygame.draw.polygon(self.screen, (0, 0, 100, 100), self.triangle_points)
 
+    def handle_event(self, event):
+        if not self.visible:
+            return
+
+        if event.type == pygame.MOUSEMOTION and self.dragging:
+            mx, my = event.pos
+            self.draw(mx, my)
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if not self.dragging:
+                self.dragging = True
+            else:
+                self.dragging = False
+                self.attack()
+                self.delete()
+
+    def attack(self):
+        enemies_hit = []
+        
+        min_x = int(min(p[0] for p in self.triangle_points))
+        max_x = int(max(p[0] for p in self.triangle_points))
+        min_y = int(min(p[1] for p in self.triangle_points))
+        max_y = int(max(p[1] for p in self.triangle_points))
+        
+        for check_x in np.arange(min_x, max_x, self.cell_size):
+            for check_y in np.arange(min_y, max_y, self.cell_size):
+                if self.is_inside_triangle((check_x, check_y)) and (check_x, check_y) != (self.x, self.y):
+                    enemy = self.map_manager.get_entity(check_x, check_y)
+                    if enemy:
+                        enemies_hit.append((enemy, check_x, check_y))
+
+        if not enemies_hit:
+            return  
+
+        roll_input = input_box_tk("Enter roll")
+        if not roll_input or not roll_input.isdigit():
+            return  
+        roll = int(roll_input)
+
+        successful_hits = [(enemy, x, y) for enemy, x, y in enemies_hit if roll >= enemy.armor_class]
+        
+        if not successful_hits:
+            message_box("Промах!")
+            return
+
+        damage_input = input_box_tk("Enter damage")
+        if not damage_input or not damage_input.isdigit():
+            return
+        damage = int(damage_input)
+
+        for _, x, y in successful_hits:
+            self.map_manager.set_damage(x, y, damage)
+    
+    def is_inside_triangle(self, point):
+        def sign(p1, p2, p3):
+            return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
+        
+        px, py = point
+        v1, v2, v3 = self.triangle_points
+        d1 = sign((px, py), v1, v2)
+        d2 = sign((px, py), v2, v3)
+        d3 = sign((px, py), v3, v1)
+        
+        has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
+        has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+        
+        return not (has_neg and has_pos)
 
 
 class CircularSpell(SpellWidget):
     def __init__(self, screen, x, y, cell_size, map_manager):
         super().__init__(screen, x, y, cell_size, map_manager)
         self.radius = 0
-        self.initialized = False  # Флаг инициализации
-    
-    def draw(self):
+        self.initialized = False  
+        self.dragging = False  
+
+    def draw(self, x, y):
         if self.visible:
             if not self.initialized:
                 try:
@@ -251,15 +423,74 @@ class CircularSpell(SpellWidget):
                 except TypeError:
                     self.initialized, self.visible = False, False
                     return
-            
-            self.rect = pygame.Rect(
-                self.rect.centerx - self.radius * self.cell_size,
-                self.rect.centery - self.radius * self.cell_size,
-                self.radius * 2 * self.cell_size,
-                self.radius * 2 * self.cell_size)
 
+            self.rect.center = (x, y)
             pygame.gfxdraw.filled_circle(
                 self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, (100, 0, 100, 100)
             )
             pygame.gfxdraw.aacircle(
-                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, (100, 0, 100, 100))
+                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, (100, 0, 100, 100)
+            )
+
+    def handle_event(self, event):
+        if not self.visible:
+            return
+
+        if event.type == pygame.MOUSEMOTION and self.dragging:
+            self.rect.center = event.pos  
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if not self.dragging:  
+                self.dragging = True  
+            else:
+                self.dragging = False  
+                mx, my = event.pos
+                self.snap_to_cell(mx, my)
+                pygame.display.flip()
+                self.attack(mx, my)
+                self.delete()
+
+    def attack(self, x, y):
+        """Атака по всем врагам в круге."""
+        cx, cy = x, y  
+        radius_px = self.radius * self.cell_size  
+
+        enemies_hit = []
+        
+        # Проходим по квадрату (2R + 1) x (2R + 1) вокруг центра
+        for row in range(-self.radius, self.radius + 1):
+            for col in range(-self.radius, self.radius + 1):
+                # Преобразуем смещение в координаты клеток
+                check_x = cx + col * self.cell_size
+                check_y = cy + row * self.cell_size
+                
+                # Проверяем, находится ли клетка внутри круга
+                if (check_x - cx) ** 2 + (check_y - cy) ** 2 <= radius_px ** 2:
+                    enemy = self.map_manager.get_entity(check_x, check_y)
+                    if enemy:
+                        enemies_hit.append((enemy, check_x, check_y))
+
+        if not enemies_hit:
+            return  
+
+        roll_input = input_box_tk("Enter roll")
+        if not roll_input or not roll_input.isdigit():
+            return  
+        roll = int(roll_input)
+
+        # Фильтруем, кого можно атаковать
+        successful_hits = [(enemy, x, y) for enemy, x, y in enemies_hit if roll >= enemy.armor_class]
+
+        if not successful_hits:
+            message_box("Промах!")
+            return
+
+        damage_input = input_box_tk("Enter damage")
+        if not damage_input or not damage_input.isdigit():
+            return
+        damage = int(damage_input)
+
+        for _, x, y in successful_hits:
+            self.map_manager.set_damage(x, y, damage)
+
+

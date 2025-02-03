@@ -5,6 +5,7 @@
         "armor_class": 12,
         "step_size": 2,
         "avatar_path": "goblin.png",
+        "death_avatar": "goblin_dead.png",
         "entity_type": "Monster"
     }
 ]
