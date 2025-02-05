@@ -2,7 +2,8 @@ import pygame
 from PIL import Image, ImageDraw
 import math
 import maptools
-
+import tkinter as tk
+from tkinter.simpledialog import askstring
 from fight_tools import Button, Toolbar
 
 
@@ -40,16 +41,21 @@ class EntityWidget:
         
     def draw(self, surface):
         """Рисует виджет и тулбар (если он есть) на заданной поверхности."""
+        avatar_path = self.entity.avatar if self.entity.hp > 0 else self.entity.death_avatar
+        avatar_image = Image.open(avatar_path).resize((self.diameter, self.diameter))
+        self.avatar_surface = self._create_circular_avatar(avatar_image)
+
         surface.blit(self.avatar_surface, (self.x, self.y))
         center_x, center_y = self.x + self.diameter / 2, self.y + self.diameter / 2
-    
+
         if self.entity.entity_type is not None:
             self._draw_hp_and_armor(surface, center_x, center_y)
-    
+
         if self.toolbar:
             self.toolbar.draw_yourself(surface)
-            if self.toolbar.sub_toolbar.isdrawn == True:
+            if self.toolbar.sub_toolbar.isdrawn:
                 self.toolbar.sub_toolbar.draw_yourself(surface)
+
 
 
     def _draw_hp_and_armor(self, surface, center_x, center_y):
@@ -164,6 +170,49 @@ class EntityWidget:
         if isinstance(damage, int):
             self.entity.hp = self.entity.hp - damage
 
+    def open_stat_adjustment_window(self):
+        """Открывает окно Tkinter для ввода значений HP и Armor."""
+        root = tk.Tk()
+        root.withdraw()  # Скрыть основное окно
+        root.attributes("-topmost", True)  # Поверх всех окон
+
+        input_window = tk.Toplevel(root)
+        input_window.title("Adjust Stats")
+        input_window.geometry("200x150")
+        input_window.resizable(False, False)
+    
+        tk.Label(input_window, text="HP:").pack()
+        hp_entry = tk.Entry(input_window)
+        hp_entry.pack()
+    
+        tk.Label(input_window, text="Armor:").pack()
+        armor_entry = tk.Entry(input_window)
+        armor_entry.pack()
+    
+        def apply_changes():
+            hp_change = hp_entry.get().strip()
+            armor_change = armor_entry.get().strip()
+        
+            try:
+                hp_value = int(hp_change) if hp_change else 0
+            except ValueError:
+                hp_value = 0
+        
+            try:
+                armor_value = int(armor_change) if armor_change else 0
+            except ValueError:
+                armor_value = 0
+        
+            self.entity.hp += hp_value
+            self.entity.armor_class += armor_value
+        
+            input_window.destroy()
+            root.destroy()
+            pygame.display.flip()
+    
+        apply_button = tk.Button(input_window, text="OK", command=apply_changes)
+        apply_button.pack()
+        input_window.mainloop()
 
 
 
@@ -171,7 +220,7 @@ class EntityWidget:
 
     
     def handle_event(self, event):
-        self.update_position() 
+        self.update_position()
         """Обрабатывает события мыши для перетаскивания или клика правой кнопкой."""
         
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -183,33 +232,32 @@ class EntityWidget:
                 self.offset_x = mouse_x - self.x
                 self.offset_y = mouse_y - self.y
                 
-
             elif self.toolbar and event.button == 1 and any(button.rect.collidepoint(event.pos) for button in self.toolbar.buttons):
                 for button in self.toolbar.buttons:
                     if button.rect.collidepoint(event.pos):
                         button.on_click()
                         self.update_position()
                         return
-            elif self.toolbar and self.toolbar.sub_toolbar.isdrawn == True and event.button == 1 and any(button.rect.collidepoint(event.pos) for button in self.toolbar.sub_toolbar.buttons):
+            elif self.toolbar and self.toolbar.sub_toolbar.isdrawn and event.button == 1 and any(button.rect.collidepoint(event.pos) for button in self.toolbar.sub_toolbar.buttons):
                 for button in self.toolbar.sub_toolbar.buttons:
                     if button.rect.collidepoint(event.pos):
                         button.on_click()
                         self.update_position()
                         return
-
-                
-
+            
             elif event.button == 3 and self.rect.collidepoint(mouse_x, mouse_y):
-                if self.toolbar:
-                    self.toolbar = None
-                    self.update_position()
+                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    self.open_stat_adjustment_window()
                 else:
-                    # Создаём тулбар на текущей позиции виджета
-                    toolbar_x = self.x + self.diameter + 10  # Смещение справа от виджета
-                    toolbar_y = self.y
-                    button_icons = ["steps.png", "sword.png", "bow.png", "magic.png"]
-                    self.toolbar = Toolbar(self, self.entity, toolbar_x, toolbar_y, self.diameter, self.spell_widgets)
-                    self.update_position()
+                    if self.toolbar:
+                        self.toolbar = None
+                        self.update_position()
+                    else:
+                        # Создаём тулбар на текущей позиции виджета
+                        toolbar_x = self.x + self.diameter + 10  # Смещение справа от виджета
+                        toolbar_y = self.y
+                        self.toolbar = Toolbar(self, self.entity, toolbar_x, toolbar_y, self.diameter, self.spell_widgets)
+                        self.update_position()
                 return
     
         elif event.type == pygame.MOUSEMOTION:
@@ -220,7 +268,6 @@ class EntityWidget:
                 self.rect.topleft = (self.x, self.y)
                 self.update_toolbar_position()
 
-                
         elif event.type == pygame.MOUSEBUTTONUP:
             if self.is_dragging:
                 mouse_x, mouse_y = event.pos

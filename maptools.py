@@ -1,6 +1,8 @@
 import pygame
 from PIL import Image
-
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from tkinter.simpledialog import askstring
 
 def get_scaled_image_properties(map_image, screen_width, screen_height):
     """
@@ -232,4 +234,131 @@ class MapManager:
                     print(f'found En at {row}, {col}, {entity}')
         print(f'E status check ended')
 
+    def get_entity_coordinates_by_name(self, entity_name):
+        """
+        Ищет сущность по имени и возвращает координаты центра соответствующей клетки.
 
+        :param entity_name: Имя сущности, которую нужно найти
+        :return: Кортеж (x, y) — координаты центра клетки или None, если сущность не найдена
+        """
+        for row in range(self.rows):
+            for col in range(self.cols):
+                entity = self.table[row][col]
+                if entity and getattr(entity, 'name', '') == entity_name:  # Проверяем имя сущности
+                    # Рассчитываем координаты центра клетки
+                    center_x = self.start_x + col * self.cell_width + self.cell_width / 2
+                    center_y = self.start_y + row * self.cell_height + self.cell_height / 2
+                    return center_x, center_y
+        return None
+
+
+class InitiativeManager:
+    
+    def __init__(self, map, ents):
+        self.map_manager = map
+        self.entities = ents
+        self.current_index = 0
+        self.roundtrip = len(ents) - 1
+        self.initiatives_set = False
+        self.names = [entity.name for entity in self.entities]
+
+    def update_current_index(self):
+        # Переход к следующему индексу, игнорируя сущности, которых нет на поле
+        next_index = self.current_index + 1 if self.current_index + 1 <= self.roundtrip else 0
+        current_entity = self.entities[next_index]
+
+        # Проверяем, находится ли сущность на поле
+        while self.map_manager.get_entity_coordinates_by_name(current_entity.name) is None:
+            next_index = next_index + 1 if next_index + 1 <= self.roundtrip else 0
+            current_entity = self.entities[next_index]
+
+        self.current_index = next_index  # Обновляем индекс
+
+    def gowngrade_current_index(self):
+        # Переход к предыдущему индексу, игнорируя сущности, которых нет на поле
+        prev_index = self.current_index - 1 if self.current_index - 1 >= 0 else self.roundtrip
+        current_entity = self.entities[prev_index]
+
+        # Проверяем, находится ли сущность на поле
+        while self.map_manager.get_entity_coordinates_by_name(current_entity.name) is None:
+            prev_index = prev_index - 1 if prev_index - 1 >= 0 else self.roundtrip
+            current_entity = self.entities[prev_index]
+
+        self.current_index = prev_index  # Обновляем индекс
+    
+    @staticmethod
+    def input_boxes_tk(names):
+        """
+        Создает окно с полями ввода для каждого имени из списка.
+        Возвращает список введенных значений (None, если ввод пустой).
+        """
+        root = tk.Tk()
+        root.title("Input Names")
+        root.geometry("300x" + str(50 * len(names)))
+        root.attributes("-topmost", True)
+    
+        entries = {}
+    
+        for i, name in enumerate(names):
+            label = tk.Label(root, text=name)
+            label.grid(row=i, column=0, padx=5, pady=5, sticky="w")
+            entry = tk.Entry(root)
+            entry.grid(row=i, column=1, padx=5, pady=5, sticky="e")
+            entries[name] = entry
+    
+        def submit():
+            root.result = [entry.get() if entry.get() else None for entry in entries.values()]
+            root.destroy()
+    
+        submit_button = tk.Button(root, text="OK", command=submit)
+        submit_button.grid(row=len(names), column=0, columnspan=2, pady=10)
+    
+        root.result = None
+        root.mainloop()
+        return root.result
+    
+    def set_initiatives(self):
+        namelist = [entity.name for entity in self.entities]
+        numbers = []
+        for number in self.input_boxes_tk(namelist):
+            try:
+                numbers.append(int(number))
+            except (ValueError, TypeError):
+                numbers.append(0)
+
+        for entity, number in zip(self.entities, numbers):
+            entity.initiative = number
+    
+        # Сортируем entities по инициативе
+        self.entities.sort(key=lambda entity: entity.initiative, reverse=True)
+        self.initiatives_set = True
+
+    def draw_current_entity_rect(self, screen):
+        if not self.initiatives_set:
+            return  # Если инициатива не установлена, ничего не рисуем
+
+        current_entity = self.entities[self.current_index]
+
+        # Получаем координаты центра клетки для текущей сущности
+        try:
+            center_x, center_y = self.map_manager.get_entity_coordinates_by_name(current_entity.name)
+        except TypeError:
+            self.update_current_index()
+            return
+        if center_x is None or center_y is None:
+            return  # Если не найдено, ничего не рисуем
+
+        # Создаем pygame.Rect с заданными параметрами
+        rect = pygame.Rect(center_x - self.map_manager.cell_width / 2, 
+                           center_y - self.map_manager.cell_height / 2, 
+                           self.map_manager.cell_width, 
+                           self.map_manager.cell_height)
+        
+        # Рисуем прямоугольник с прозрачным зеленым фоном
+        pygame.draw.rect(screen, (0, 255, 0), rect, 2)  # Обводка прямоугольника (зеленая)
+
+        
+        
+
+        
+        
