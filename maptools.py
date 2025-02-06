@@ -3,6 +3,7 @@ from PIL import Image
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter.simpledialog import askstring
+import Gameclass
 
 def get_scaled_image_properties(map_image, screen_width, screen_height):
     """
@@ -355,7 +356,7 @@ class InitiativeManager:
                            self.map_manager.cell_height)
         
         # Рисуем прямоугольник с прозрачным зеленым фоном
-        pygame.draw.rect(screen, (0, 255, 0), rect, 2)  # Обводка прямоугольника (зеленая)
+        pygame.draw.rect(screen, Gameclass.CURRENT_COLOR_PRESET.initiative, rect, 2)  # Обводка прямоугольника (зеленая)
 
         
         

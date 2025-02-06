@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter.simpledialog import askstring
 from math import floor, sqrt, atan2, cos, sin, radians, degrees
+import Gameclass
 
 def input_box_tk(prompt):
     root = tk.Tk()
@@ -72,6 +73,8 @@ class SpellWidget:
         self.offset_y = 0  # Смещение по y для таскания из центра
         self.dropped_position = (self.x, self.y)  # Координаты последнего дропа
         self.map_manager = map_manager
+        self.fillingcol = Gameclass.CURRENT_COLOR_PRESET.player_spells_fill
+        self.bordercol = Gameclass.CURRENT_COLOR_PRESET.player_spells_border
 
     def draw(self, x, y):
         if self.visible:  # Отрисовываем только если видим
@@ -79,8 +82,8 @@ class SpellWidget:
             center_y = y
             radius = self.cell_size // 2
             center = self.rect.center
-            pygame.gfxdraw.filled_circle(self.screen, center[0], center[1], radius, (100, 0, 0, 100))
-            pygame.gfxdraw.aacircle(self.screen, center[0], center[1], radius, (100, 0, 0, 100))
+            pygame.gfxdraw.filled_circle(self.screen, center[0], center[1], radius, self.fillingcol)
+            pygame.gfxdraw.aacircle(self.screen, center[0], center[1], radius, self.bordercol)
             
     def snap_to_cell(self, mouse_x, mouse_y):
         # Проверяем, что координаты внутри границ карты
@@ -155,8 +158,8 @@ class BowSpell(SpellWidget):
         if self.visible:
             self.rect.center = (x, y)
             radius = self.cell_size // 2
-            pygame.gfxdraw.filled_circle(self.screen, self.rect.centerx, self.rect.centery, radius, (100, 0, 0, 100))
-            pygame.gfxdraw.aacircle(self.screen, self.rect.centerx, self.rect.centery, radius, (100, 0, 0, 100))
+            pygame.gfxdraw.filled_circle(self.screen, self.rect.centerx, self.rect.centery, radius, self.fillingcol)
+            pygame.gfxdraw.aacircle(self.screen, self.rect.centerx, self.rect.centery, radius, self.bordercol)
 
     def handle_event(self, event):
         if not self.visible:
@@ -236,7 +239,7 @@ class LinearSpell(SpellWidget):
             end_y = self.y + sin(self.angle) * (self.length+0.5) * self.cell_size
 
             # Рисуем прямоугольник вдоль направления
-            pygame.draw.line(self.screen, (0, 100, 0, 100), (self.x, self.y), (end_x, end_y), self.cell_size//3)
+            pygame.draw.line(self.screen, self.fillingcol, (self.x, self.y), (end_x, end_y), self.cell_size//3)
 
     def handle_event(self, event):
         """Обрабатывает ввод игрока"""
@@ -336,7 +339,7 @@ class TriangleSpell(SpellWidget):
             right_y = base_center_y + cos(self.angle) * base_half
 
             self.triangle_points = [(top_x, top_y), (left_x, left_y), (right_x, right_y)]
-            pygame.draw.polygon(self.screen, (0, 0, 100, 100), self.triangle_points)
+            pygame.draw.polygon(self.screen, self.fillingcol, self.triangle_points)
 
     def handle_event(self, event):
         if not self.visible:
@@ -426,10 +429,10 @@ class CircularSpell(SpellWidget):
 
             self.rect.center = (x, y)
             pygame.gfxdraw.filled_circle(
-                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, (100, 0, 100, 100)
+                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, self.fillingcol
             )
             pygame.gfxdraw.aacircle(
-                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, (100, 0, 100, 100)
+                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, self.bordercol
             )
 
     def handle_event(self, event):

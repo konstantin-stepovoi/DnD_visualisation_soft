@@ -1,7 +1,8 @@
 {
     "title": "Village_fight",
-    "map_path": "map.png",
-    "num_tiles": 17,
+    "map_path": "map2.png",
+    "num_tiles": 10,
     "players_path": "players.json",
-    "monsters_path": "monsters.json"
+    "monsters_path": "monsters.json",
+    "map_type": "duna"
 }

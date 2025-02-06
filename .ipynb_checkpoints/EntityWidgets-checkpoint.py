@@ -5,6 +5,7 @@ import maptools
 import tkinter as tk
 from tkinter.simpledialog import askstring
 from fight_tools import Button, Toolbar
+import Gameclass
 
 
 class EntityWidget:
@@ -66,11 +67,11 @@ class EntityWidget:
         hp_rect = pygame.Rect(hp_x, hp_y, square_side, square_side)
         
         if self.entity.entity_type == 'Player':
-            square_color = (107, 142, 35)
-            border_color = (85, 107, 47)
+            square_color = Gameclass.CURRENT_COLOR_PRESET.hp_fill
+            border_color = Gameclass.CURRENT_COLOR_PRESET.hp_border
         else:
-            square_color = (130, 0, 0)
-            border_color = (200, 0, 0)
+            square_color = Gameclass.CURRENT_COLOR_PRESET.hp_fill
+            border_color = Gameclass.CURRENT_COLOR_PRESET.hp_border
         
         pygame.draw.rect(surface, square_color, hp_rect)  # Основной квадрат
         pygame.draw.rect(surface, border_color, hp_rect, width=2)  # Обводка
@@ -96,8 +97,8 @@ class EntityWidget:
             (pentagon_x0, pentagon_y0 + pentagon_height),
             (pentagon_x0 - 0.81 * side, pentagon_y0 + pentagon_height - 0.588 * side),
         ]
-        penta_color = (176, 196, 222)
-        penta_border_color = (65, 105, 225)
+        penta_color = Gameclass.CURRENT_COLOR_PRESET.armor_border
+        penta_border_color = Gameclass.CURRENT_COLOR_PRESET.armor_border
         
         pygame.draw.polygon(surface, penta_color, pentagon_points)
         pygame.draw.polygon(surface, penta_border_color, pentagon_points, width=2)
