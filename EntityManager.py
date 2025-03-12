@@ -11,6 +11,7 @@ class Entity:
         self.pos = (0, 0)
         self.initiative = 0
         self.death_avatar = death_avatar
+        self.hotkey = None
 
 def load_from_json(file_path):
     with open(file_path, 'r') as file:

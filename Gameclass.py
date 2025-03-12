@@ -90,8 +90,8 @@ class ColorPreset:
         self.button_font = (255, 255, 255, 255)
         self.monster_spells_fill = (255, 165, 0, 100)
         self.monster_spells_border = (255, 69, 0, 255)
-        self.player_spells_border = (0, 255, 255, 255)
-        self.player_spells_fill = (0, 255, 255, 100)
+        self.player_spells_border = (0, 255, 255, 150)
+        self.player_spells_fill = (0, 255, 255, 10)
 
 # --- Словарь пресетов ---
 COLOR_PRESETS = {

@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter.simpledialog import askstring
 from math import floor, sqrt, atan2, cos, sin, radians, degrees
+import math
 import Gameclass
 
 def input_box_tk(prompt):
@@ -75,6 +76,7 @@ class SpellWidget:
         self.map_manager = map_manager
         self.fillingcol = Gameclass.CURRENT_COLOR_PRESET.player_spells_fill
         self.bordercol = Gameclass.CURRENT_COLOR_PRESET.player_spells_border
+        self.iconic_path = ['arrow.png', 'flow.png', 'spray.png', 'explosion.png']
 
     def draw(self, x, y):
         if self.visible:  # Отрисовываем только если видим
@@ -154,12 +156,21 @@ class BowSpell(SpellWidget):
         self.dragging = False  # НЕ в режиме перетаскивания при создании
 
     def draw(self, x, y):
-        """Рисует спелл вокруг курсора, если он активен."""
+        """Рисует стрелу вокруг курсора, если она активна."""
         if self.visible:
             self.rect.center = (x, y)
-            radius = self.cell_size // 2
-            pygame.gfxdraw.filled_circle(self.screen, self.rect.centerx, self.rect.centery, radius, self.fillingcol)
-            pygame.gfxdraw.aacircle(self.screen, self.rect.centerx, self.rect.centery, radius, self.bordercol)
+            arrow_image = pygame.image.load(self.iconic_path[0]).convert()
+            arrow_image.set_colorkey((255, 255, 255))
+            arrow_image = arrow_image.convert_alpha()
+            scaled_size = (self.cell_size, self.cell_size)
+            arrow_image = pygame.transform.smoothscale(arrow_image, scaled_size)
+            for i in range(scaled_size[0]):
+                for j in range(scaled_size[1]):
+                    r, g, b, a = arrow_image.get_at((i, j))
+                    arrow_image.set_at((i, j), (r, g, b, min(a, 120)))  # Ограничиваем прозрачность
+            image_rect = arrow_image.get_rect(center=self.rect.center)
+            self.screen.blit(arrow_image, image_rect.topleft)
+
 
     def handle_event(self, event):
         if not self.visible:
@@ -217,29 +228,75 @@ class LinearSpell(SpellWidget):
         self.initialized = False
         self.angle = 0  # Угол поворота
         self.dragging = False  
-
+        
     def draw(self, x, y):
-        """Рисует прямоугольник вдоль направления на курсор"""
         if self.visible:
             if not self.initialized:
                 try:
                     self.length = int(input_box_tk("Enter length"))
                     self.initialized = True
-                except TypeError:
+                except (TypeError, ValueError):
                     self.initialized, self.visible = False, False
                     return
-            
-            # Вычисляем угол между начальной точкой (x, y) и текущим положением курсора
             dx = x - self.x
             dy = y - self.y
-            self.angle = atan2(dy, dx)  # Угол в радианах
+            self.angle = atan2(dy, dx)  # Сохраняем угол для атаки
+            abs_length = (self.length + 0.5) * self.cell_size
+            width = self.cell_size * 0.5
+            center_x = self.x + cos(self.angle) * abs_length / 2
+            center_y = self.y + sin(self.angle) * abs_length / 2
+            flow_image = pygame.image.load(self.iconic_path[1]).convert()
+            flow_image.set_colorkey((255, 255, 255))
+            flow_image = flow_image.convert_alpha()
+            scaled_size = (abs_length, width)  # Масштабируем по длине и ширине
+            flow_image = pygame.transform.smoothscale(flow_image, scaled_size)
+            rotated_flow_image = pygame.transform.rotate(flow_image, -degrees(self.angle))
+            flow_rect = rotated_flow_image.get_rect(center=(center_x, center_y))
+            self.screen.blit(rotated_flow_image, flow_rect.topleft)
 
-            # Вычисляем координаты второй короткой стороны
-            end_x = self.x + cos(self.angle) * (self.length+0.5)* self.cell_size
-            end_y = self.y + sin(self.angle) * (self.length+0.5) * self.cell_size
 
-            # Рисуем прямоугольник вдоль направления
-            pygame.draw.line(self.screen, self.fillingcol, (self.x, self.y), (end_x, end_y), self.cell_size//3)
+
+    def attack(self):
+        """Проводит атаку по всем врагам в линии (кроме клетки с магом)"""
+        enemies_hit = []
+    
+        # Получаем клеточные координаты мага
+        start_x = round(self.x / self.cell_size)
+        start_y = round(self.y / self.cell_size)
+    
+        # Вычисляем шаги вдоль линии в координатах сетки, начиная со следующей клетки
+        for i in range(1, self.length + 1):
+            check_x = self.x + cos(self.angle) * i * self.cell_size
+            check_y = self.y + sin(self.angle) * i * self.cell_size
+
+            enemy = self.map_manager.get_entity(check_x, check_y)
+            if enemy:
+                enemies_hit.append((enemy, check_x, check_y))
+        
+        if not enemies_hit:
+            return  
+    
+        roll_input = input_box_tk("Enter roll")
+        if not roll_input or not roll_input.isdigit():
+            return  
+        roll = int(roll_input)
+    
+        # Фильтруем, кого можно атаковать
+        successful_hits = [(enemy, x, y) for enemy, x, y in enemies_hit if roll >= enemy.armor_class]
+    
+        if not successful_hits:
+            message_box("Промах!")
+            return
+    
+        damage_input = input_box_tk("Enter damage")
+        if not damage_input or not damage_input.isdigit():
+            return
+        damage = int(damage_input)
+    
+        for _, x, y in successful_hits:
+            self.map_manager.set_damage(x, y, damage)
+
+
 
     def handle_event(self, event):
         """Обрабатывает ввод игрока"""
@@ -258,47 +315,6 @@ class LinearSpell(SpellWidget):
                 self.attack()
                 self.delete()
 
-    def attack(self):
-        """Проводит атаку по всем врагам в линии (кроме клетки с магом)"""
-        enemies_hit = []
-        
-        '''
-        Сейчас не работает вот этот кусок!
-        тут надо поправить определение координат в которые будем пытаться атаковать
-        '''
-        
-        # Вычисляем шаги вдоль линии
-        for i in range(1, self.length + 1):
-            check_x = self.x + cos(self.angle) * i * self.cell_size
-            check_y = self.y + sin(self.angle) * i * self.cell_size
-
-            enemy = self.map_manager.get_entity(check_x, check_y)
-            if enemy:
-                enemies_hit.append((enemy, check_x, check_y))
-
-        if not enemies_hit:
-            return  
-
-        roll_input = input_box_tk("Enter roll")
-        if not roll_input or not roll_input.isdigit():
-            return  
-        roll = int(roll_input)
-
-        # Фильтруем, кого можно атаковать
-        successful_hits = [(enemy, x, y) for enemy, x, y in enemies_hit if roll >= enemy.armor_class]
-
-        if not successful_hits:
-            message_box("Промах!")
-            return
-
-        damage_input = input_box_tk("Enter damage")
-        if not damage_input or not damage_input.isdigit():
-            return
-        damage = int(damage_input)
-
-        for _, x, y in successful_hits:
-            self.map_manager.set_damage(x, y, damage)
-
 
 
 class TriangleSpell(SpellWidget):
@@ -308,7 +324,8 @@ class TriangleSpell(SpellWidget):
         self.base = 0
         self.initialized = False  
         self.angle = 0  # Угол поворота
-        self.dragging = False  
+        self.dragging = False
+        self.image = pygame.image.load('spray.png').convert_alpha()
 
     def draw(self, x, y):
         if self.visible:
@@ -339,7 +356,17 @@ class TriangleSpell(SpellWidget):
             right_y = base_center_y + cos(self.angle) * base_half
 
             self.triangle_points = [(top_x, top_y), (left_x, left_y), (right_x, right_y)]
-            pygame.draw.polygon(self.screen, self.fillingcol, self.triangle_points)
+
+            triangle_surface = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+
+            # Рисуем обводку
+            pygame.draw.polygon(triangle_surface, self.bordercol, self.triangle_points, width=3)
+
+            # Рисуем заливку
+            pygame.draw.polygon(triangle_surface, self.fillingcol, self.triangle_points)
+
+            # Накладываем на экран
+            self.screen.blit(triangle_surface, (0, 0))
 
     def handle_event(self, event):
         if not self.visible:
@@ -374,7 +401,9 @@ class TriangleSpell(SpellWidget):
 
         if not enemies_hit:
             return  
-
+            
+        print(enemies_hit)
+        enemies_hit = enemies_hit[:-1]
         roll_input = input_box_tk("Enter roll")
         if not roll_input or not roll_input.isdigit():
             return  
@@ -393,21 +422,37 @@ class TriangleSpell(SpellWidget):
 
         for _, x, y in successful_hits:
             self.map_manager.set_damage(x, y, damage)
-    
+
     def is_inside_triangle(self, point):
         def sign(p1, p2, p3):
             return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
         
+        def check_point(p):
+            px, py = p
+            v1, v2, v3 = self.triangle_points
+            d1 = sign((px, py), v1, v2)
+            d2 = sign((px, py), v2, v3)
+            d3 = sign((px, py), v3, v1)
+            
+            has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
+            has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+            
+            return not (has_neg and has_pos)
+        
         px, py = point
-        v1, v2, v3 = self.triangle_points
-        d1 = sign((px, py), v1, v2)
-        d2 = sign((px, py), v2, v3)
-        d3 = sign((px, py), v3, v1)
+        r = self.cell_size / 2
         
-        has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
-        has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+        # Генерируем точки по окружности + саму точку
+        check_points = [(px, py)]  # Исходная точка
+        for angle in range(0, 360, 45):  # Берем 8 точек по кругу
+            rad = math.radians(angle)
+            x_offset = r * math.cos(rad)
+            y_offset = r * math.sin(rad)
+            check_points.append((px + x_offset, py + y_offset))
         
-        return not (has_neg and has_pos)
+        # Если хотя бы одна из точек попадает в треугольник, возвращаем True
+        return any(check_point(p) for p in check_points)
+
 
 
 class CircularSpell(SpellWidget):
@@ -423,17 +468,32 @@ class CircularSpell(SpellWidget):
                 try:
                     self.radius = int(input_box_tk("Enter radius"))
                     self.initialized = True
-                except TypeError:
+                except (TypeError, ValueError):
                     self.initialized, self.visible = False, False
                     return
-
+    
             self.rect.center = (x, y)
-            pygame.gfxdraw.filled_circle(
-                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, self.fillingcol
-            )
-            pygame.gfxdraw.aacircle(
-                self.screen, self.rect.centerx, self.rect.centery, self.radius * self.cell_size, self.bordercol
-            )
+    
+            # Загружаем картинку
+            explosion_image = pygame.image.load(self.iconic_path[3]).convert_alpha()
+    
+            # Масштабируем под нужный размер круга
+            scaled_size = (self.radius * self.cell_size * 2, self.radius * self.cell_size * 2)
+            explosion_image = pygame.transform.smoothscale(explosion_image, scaled_size)
+    
+            # Делаем белый цвет прозрачным
+            explosion_image = explosion_image.copy()
+            explosion_image.set_colorkey((255, 255, 255))  # Убираем белый
+    
+            # Устанавливаем прозрачность (альфа-канал = 120)
+            explosion_image.set_alpha(120)
+    
+            # Получаем координаты, чтобы центрировать картинку
+            draw_x = x - self.radius * self.cell_size
+            draw_y = y - self.radius * self.cell_size
+    
+            # Рисуем изображение
+            self.screen.blit(explosion_image, (draw_x, draw_y))
 
     def handle_event(self, event):
         if not self.visible:

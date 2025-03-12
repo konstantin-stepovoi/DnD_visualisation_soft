@@ -27,6 +27,7 @@ class EntityWidget:
         self.toolbar = None
         self.screen = screen
         self.spell_widgets = spell_widgets
+        self.is_active = self.entity.entity_type == "Player"
         
     def _create_circular_avatar(self, image):
         """Обрезает изображение в круг и возвращает Pygame Surface."""
@@ -41,6 +42,8 @@ class EntityWidget:
         return pygame.image.fromstring(circular_image.tobytes(), circular_image.size, circular_image.mode)
         
     def draw(self, surface):
+        if not self.is_active:
+            return
         """Рисует виджет и тулбар (если он есть) на заданной поверхности."""
         avatar_path = self.entity.avatar if self.entity.hp > 0 else self.entity.death_avatar
         avatar_image = Image.open(avatar_path).resize((self.diameter, self.diameter))
@@ -49,7 +52,7 @@ class EntityWidget:
         surface.blit(self.avatar_surface, (self.x, self.y))
         center_x, center_y = self.x + self.diameter / 2, self.y + self.diameter / 2
 
-        if self.entity.entity_type is not None:
+        if self.entity.entity_type != "Monster":
             self._draw_hp_and_armor(surface, center_x, center_y)
 
         if self.toolbar:
@@ -176,21 +179,22 @@ class EntityWidget:
         root = tk.Tk()
         root.withdraw()  # Скрыть основное окно
         root.attributes("-topmost", True)  # Поверх всех окон
-
+    
         input_window = tk.Toplevel(root)
         input_window.title("Adjust Stats")
         input_window.geometry("200x150")
         input_window.resizable(False, False)
-    
+        
         tk.Label(input_window, text="HP:").pack()
         hp_entry = tk.Entry(input_window)
         hp_entry.pack()
-    
+        
         tk.Label(input_window, text="Armor:").pack()
         armor_entry = tk.Entry(input_window)
         armor_entry.pack()
-    
+        
         def apply_changes():
+            """Применяет изменения и закрывает окна."""
             hp_change = hp_entry.get().strip()
             armor_change = armor_entry.get().strip()
         
@@ -207,12 +211,20 @@ class EntityWidget:
             self.entity.hp += hp_value
             self.entity.armor_class += armor_value
         
+            close_window()
+        
+        def close_window():
+            """Безопасно закрывает окна Tkinter."""
             input_window.destroy()
             root.destroy()
-            pygame.display.flip()
+            pygame.display.flip()  # Обновляем экран Pygame после закрытия окна
+        
+        # Обработчик закрытия окна через "крестик"
+        input_window.protocol("WM_DELETE_WINDOW", close_window)
     
         apply_button = tk.Button(input_window, text="OK", command=apply_changes)
         apply_button.pack()
+        
         input_window.mainloop()
 
 
@@ -221,6 +233,9 @@ class EntityWidget:
 
     
     def handle_event(self, event):
+        if not self.is_active:
+            return
+            
         self.update_position()
         """Обрабатывает события мыши для перетаскивания или клика правой кнопкой."""
         

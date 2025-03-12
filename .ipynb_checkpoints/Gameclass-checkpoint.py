@@ -11,6 +11,7 @@ class Game:
         self.map_path = ""
         self.players_path = ""
         self.monsters_path = ""
+        self.map_type = ""
         self.num_tiles = 0
 
         # Вызов окна для выбора JSON-файла битвы
@@ -42,6 +43,7 @@ class Game:
             self.players_path = data.get("players_path", "")
             self.monsters_path = data.get("monsters_path", "")
             self.num_tiles = data.get("num_tiles", 2)
+            self.map_type = data.get("map_type", "")
 
             # Выводим подтверждение
             messagebox.showinfo("Успех", f"Игра '{self.title}' успешно загружена!")
@@ -67,11 +69,12 @@ def load_game_assets(game):
         raise FileNotFoundError(f"Не удалось загрузить карту по пути {game.map_path}: {e}")
 
     num_tiles = game.num_tiles
+    map_type = game.map_type
     # Загружаем игроков и монстров
     players_entities = EntityManager.load_from_json(game.players_path)
     monsters_entities = EntityManager.load_from_json(game.monsters_path)
     
-    return map_image, players_entities, monsters_entities, num_tiles
+    return map_image, players_entities, monsters_entities, num_tiles, map_type
 
 
 class ColorPreset:
@@ -87,8 +90,8 @@ class ColorPreset:
         self.button_font = (255, 255, 255, 255)
         self.monster_spells_fill = (255, 165, 0, 100)
         self.monster_spells_border = (255, 69, 0, 255)
-        self.player_spells_border = (0, 255, 255, 255)
-        self.player_spells_fill = (0, 255, 255, 100)
+        self.player_spells_border = (0, 255, 255, 150)
+        self.player_spells_fill = (0, 255, 255, 10)
 
 # --- Словарь пресетов ---
 COLOR_PRESETS = {
