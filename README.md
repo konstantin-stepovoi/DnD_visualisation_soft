@@ -16,7 +16,7 @@ This repository contains a program I developed both for **self-learning** — to
    - Map layout
    - Player and monster data
    - Game parameters
-   - 
+   
 Here are some screenshots of the game in action:
 ![Game demo](Demo.png)
 
