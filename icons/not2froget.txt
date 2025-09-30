@@ -1,0 +1,1 @@
+A reminder for future reference: it would be wise to later separate the icons for the main application window and the toolbar icons for specific entities. But there's no rush.
