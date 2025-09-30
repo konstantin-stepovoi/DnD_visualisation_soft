@@ -1,0 +1,4 @@
+I'll leave it to myself to figure out which module works where.
+- The Entity Manager keeps track of which players are still alive and how much HP, armor, and so on they have. It also remembers and updates coordinates.
+- Entity Widgets describes the logic behind the widget behavior of some abstract entity, whether it's an enemy or a player. Click logic and key reactions are also included.
+- The GameClass is simply responsible for loading color assets according to the map tile color palette.
